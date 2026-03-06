@@ -57,7 +57,7 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173** and enter a story idea.
+Open **http://localhost:XXXX** and enter a story idea.
 
 ## Demo Mode
 
