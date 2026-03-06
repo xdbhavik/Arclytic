@@ -12,7 +12,11 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Run the dev server
+# 3. Configure environment variables
+# Copy the example `.env` and fill in your details:
+cp .env.example .env
+
+# 4. Run the dev server
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -59,11 +63,14 @@ LLM_BASE_URL="https://api.openai.com/v1" LLM_MODEL="gpt-4o-mini" LLM_API_KEY="sk
 
 ### Using Google Gemini (Free Tier Available)
 
-Google provides an OpenAI-compatible endpoint that works out-of-the-box:
+Google provides an OpenAI-compatible endpoint that works out-of-the-box. Add this to your `.env` file:
 
-```bash
-LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/" LLM_MODEL="gemini-2.0-flash" LLM_API_KEY="AIza..." uvicorn app.main:app --reload --port 0
+```env
+LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"
+LLM_MODEL="gemini-3.1-flash-lite-preview"
+LLM_API_KEY="AIza..."
 ```
+Then run: `uvicorn app.main:app --reload --port 0`
 
 ### Using Real NLP Models
 

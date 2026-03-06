@@ -12,6 +12,9 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from app.models import AnalyseRequest, AnalyseResponse
 from app.services import (
