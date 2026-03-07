@@ -25,7 +25,9 @@ const css = `
 
 .iform-textarea {
   width: 100%;
-  min-height: 110px;
+  min-height: 220px;
+  max-height: 420px;
+  overflow-y: auto;
   resize: vertical;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
