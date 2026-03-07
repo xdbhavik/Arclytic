@@ -40,6 +40,13 @@ The API will be available at **http://localhost:8000**.
 }
 ```
 
+### Error Handling
+
+The backend detects and handles pipeline failures gracefully:
+- **401 Unauthorized**: Returned if the LLM API key is invalid, missing, or rejected by the provider.
+- **500 Internal Server Error**: Surface other pipeline or generation failures with a descriptive message.
+- **Fallbacks**: If no `LLM_BASE_URL` is configured, it falls back to demo data automatically without throwing errors.
+
 ## Swapping in Real Models
 
 The app uses **DemoLLMClient** and **DemoNLPClient** by default (no API keys needed, zero setup).

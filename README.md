@@ -1,6 +1,6 @@
 # Episodic Intelligence Engine
 
-Analyse short story ideas and decompose them into structured **vertical-video episode arcs** with emotional tracking, cliffhanger scoring, retention prediction, and improvement suggestions.
+Analyse short story ideas and decompose them into structured **vertical-video episode arcs** with emotional tracking, cliffhanger scoring, retention prediction, improvement suggestions, and robust API error handling.
 
 ## Architecture
 

@@ -25,6 +25,9 @@ cd ../backend
 uvicorn app.main:app --reload --port 8000
 ```
 
+### Error Handling
+The UI elegantly captures and displays backend errors. For example, if the LLM API token is invalid, the backend will return a `401 Unauthorized` exception. The frontend parses this JSON error and presents a clean "Authentication failed. Please check your API key" alert to the user instead of generic error traces.
+
 ## Build for Production
 
 ```bash
