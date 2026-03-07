@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import InputForm from './components/InputForm.jsx';
 import EpisodesPanel from './components/EpisodesPanel.jsx';
 import EmotionalArcPanel from './components/EmotionalArcPanel.jsx';
@@ -80,6 +80,76 @@ body {
 @keyframes count-up  { from{opacity:0;transform:scale(.8)} to{opacity:1;transform:none} }
 @keyframes orbit     { from{transform:rotate(0deg) translateX(140px) rotate(0deg)} to{transform:rotate(360deg) translateX(140px) rotate(-360deg)} }
 
+@keyframes orb-a {
+  0%,100% { transform:translate(0,0) scale(1); opacity:.7; }
+  40%     { transform:translate(80px,-60px) scale(1.12); opacity:1; }
+  70%     { transform:translate(-40px,70px) scale(.93); opacity:.6; }
+}
+@keyframes orb-b {
+  0%,100% { transform:translate(0,0) scale(1); opacity:.6; }
+  35%     { transform:translate(-70px,50px) scale(1.07); opacity:.9; }
+  65%     { transform:translate(90px,-40px) scale(.96); opacity:.65; }
+}
+@keyframes orb-c {
+  0%,100% { transform:translate(-50%,-50%) scale(1); opacity:.5; }
+  50%     { transform:translate(-50%,-50%) scale(1.18); opacity:.8; }
+}
+@keyframes beam-pulse {
+  0%,100% { opacity:.4; }
+  50%     { opacity:1; }
+}
+
+/* ── Background layer ── */
+.arc-bg {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none; overflow: hidden;
+}
+.arc-bg-orb {
+  position: absolute; border-radius: 50%;
+  will-change: transform;
+}
+.arc-bg-orb-1 {
+  width: 700px; height: 700px; top: -180px; left: -120px;
+  background: radial-gradient(circle at 40% 40%, rgba(0,212,255,.09) 0%, transparent 65%);
+  filter: blur(60px);
+  animation: orb-a 20s ease-in-out infinite;
+}
+.arc-bg-orb-2 {
+  width: 800px; height: 800px; bottom: -200px; right: -160px;
+  background: radial-gradient(circle at 60% 60%, rgba(139,92,246,.10) 0%, transparent 65%);
+  filter: blur(70px);
+  animation: orb-b 26s ease-in-out infinite;
+}
+.arc-bg-orb-3 {
+  width: 500px; height: 500px; top: 45%; left: 50%;
+  background: radial-gradient(circle, rgba(16,217,160,.065) 0%, transparent 65%);
+  filter: blur(55px);
+  animation: orb-c 16s ease-in-out infinite;
+}
+.arc-bg-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 80%);
+}
+.arc-bg-beam {
+  position: absolute; top: 26%; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0,212,255,.04) 20%,
+    rgba(0,212,255,.14) 50%,
+    rgba(0,212,255,.04) 80%,
+    transparent 100%);
+  filter: blur(1px);
+  animation: beam-pulse 6s ease-in-out infinite;
+}
+.arc-bg-vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 90% 90% at 50% 50%, transparent 35%, rgba(5,8,18,.7) 100%);
+}
+
 .anim-fade  { animation: fadeIn .45s ease both; }
 .anim-fade2 { animation: fadeIn .45s .08s ease both; }
 .anim-fade3 { animation: fadeIn .45s .16s ease both; }
@@ -91,8 +161,9 @@ body {
   display: grid;
   grid-template-columns: 240px 1fr;
   grid-template-rows: 52px 1fr;
-  min-height: 100vh;
+  height: 100vh;
   position: relative;
+  overflow: hidden;
 }
 
 /* ── Topbar ── */
@@ -204,9 +275,13 @@ body {
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
+  overflow-x: hidden;
   position: sticky;
   top: 52px;
   height: calc(100vh - 52px);
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
 }
 
 .sidebar-section-label {
@@ -330,7 +405,7 @@ body {
 /* ── Main content ── */
 .arc-main {
   background: var(--bg);
-  overflow-y: auto;
+  overflow: hidden;
   position: relative;
 }
 
@@ -354,6 +429,7 @@ body {
   z-index: 1;
   padding: 32px 36px;
   max-width: 960px;
+  will-change: transform;
 }
 
 /* ── Hero area ── */
@@ -656,15 +732,182 @@ function LoaderSteps() {
   );
 }
 
+/* ── Lerp virtual scroll ──────────────────────────────────────── */
+function useLerpScroll(containerRef, contentRef) {
+  const syRef = useRef(0); // target scroll Y
+  const dyRef = useRef(0); // current lerped Y
+
+  // expose a reset so we can scroll-to-top programmatically
+  const scrollToTop = useCallback(() => { syRef.current = 0; }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const content   = contentRef.current;
+    if (!container || !content) return;
+
+    let rafId;
+
+    function getMax() {
+      return Math.max(0, content.scrollHeight - container.clientHeight);
+    }
+
+    function li(a, b, n) {
+      return (1 - n) * a + n * b;
+    }
+
+    function render() {
+      dyRef.current = li(dyRef.current, syRef.current, 0.085);
+      dyRef.current = Math.floor(dyRef.current * 100) / 100;
+      content.style.transform = `translate3d(0, -${dyRef.current}px, 0)`;
+      rafId = requestAnimationFrame(render);
+    }
+
+    function onWheel(e) {
+      e.preventDefault();
+      syRef.current = Math.max(0, Math.min(syRef.current + e.deltaY, getMax()));
+    }
+
+    // keyboard scroll support
+    function onKeyDown(e) {
+      if (!container.matches(':hover') && document.activeElement?.closest('.arc-main') === null) return;
+      const max = getMax();
+      const by = { ArrowDown: 80, ArrowUp: -80, PageDown: container.clientHeight * 0.9, PageUp: -container.clientHeight * 0.9, Home: -Infinity, End: Infinity };
+      if (by[e.key] !== undefined) {
+        e.preventDefault();
+        syRef.current = Math.max(0, Math.min(syRef.current + by[e.key], max));
+      }
+    }
+
+    // touch support
+    let touchY = 0;
+    function onTouchStart(e) { touchY = e.touches[0].clientY; }
+    function onTouchMove(e) {
+      e.preventDefault();
+      const delta = touchY - e.touches[0].clientY;
+      touchY = e.touches[0].clientY;
+      syRef.current = Math.max(0, Math.min(syRef.current + delta, getMax()));
+    }
+
+    rafId = requestAnimationFrame(render);
+    container.addEventListener('wheel',      onWheel,      { passive: false });
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      container.removeEventListener('wheel',      onWheel);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove',  onTouchMove);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [containerRef, contentRef]);
+
+  return scrollToTop;
+}
+
+/* ── Cursor trail ─────────────────────────────────────────────── */
+function useCursorTrail() {
+  useEffect(() => {
+    const TRAIL_COUNT = 5;
+    const dots = [];
+
+    for (let i = 0; i < TRAIL_COUNT; i++) {
+      const el = document.createElement('div');
+      const progress = i / (TRAIL_COUNT - 1);
+      const size = 5.5 - progress * 3.5;
+      el.style.cssText = `
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 50%;
+        background: ${i === 0
+          ? 'rgba(0,212,255,0.95)'
+          : `rgba(0,212,255,${(0.55 - progress * 0.5).toFixed(2)})`};
+        box-shadow: 0 0 ${6 - i}px rgba(0,212,255,${(0.45 - progress * 0.4).toFixed(2)});
+        transform: translate(-50%, -50%);
+        left: -100px; top: -100px;
+        mix-blend-mode: screen;
+      `;
+      document.body.appendChild(el);
+      dots.push(el);
+    }
+
+    const ring = document.createElement('div');
+    ring.style.cssText = `
+      position: fixed;
+      pointer-events: none;
+      z-index: 9998;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.2);
+      transform: translate(-50%, -50%);
+      transition: width 0.12s, height 0.12s, border-color 0.12s;
+      left: -100px; top: -100px;
+    `;
+    document.body.appendChild(ring);
+
+    let mouse = { x: -100, y: -100 };
+    let positions = Array.from({ length: TRAIL_COUNT }, () => ({ x: -100, y: -100 }));
+    let rafId;
+
+    const onMove = (e) => { mouse.x = e.clientX; mouse.y = e.clientY; };
+    const onDown = () => { ring.style.width = '14px'; ring.style.height = '14px'; ring.style.borderColor = 'rgba(0,212,255,0.6)'; };
+    const onUp   = () => { ring.style.width = '24px'; ring.style.height = '24px'; ring.style.borderColor = 'rgba(0,212,255,0.2)'; };
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function render() {
+      // High lerp factor (0.45) = dots cluster tightly = short trail
+      positions[0] = { x: lerp(positions[0].x, mouse.x, 0.45), y: lerp(positions[0].y, mouse.y, 0.45) };
+      for (let i = 1; i < TRAIL_COUNT; i++) {
+        positions[i] = {
+          x: lerp(positions[i].x, positions[i - 1].x, 0.42),
+          y: lerp(positions[i].y, positions[i - 1].y, 0.42),
+        };
+      }
+      dots.forEach((el, i) => {
+        el.style.left = positions[i].x + 'px';
+        el.style.top  = positions[i].y + 'px';
+      });
+      ring.style.left = positions[0].x + 'px';
+      ring.style.top  = positions[0].y + 'px';
+      rafId = requestAnimationFrame(render);
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('mouseup',   onUp);
+    rafId = requestAnimationFrame(render);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mouseup',   onUp);
+      dots.forEach(el => el.remove());
+      ring.remove();
+    };
+  }, []);
+}
+
 export default function App() {
   injectCSS();
+  useCursorTrail();
+
+  useEffect(() => { document.title = 'Arclytic'; }, []);
 
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState(null);
   const [activeTab, setActiveTab] = useState('episodes');
   const [genTime,   setGenTime]   = useState(null);
-  const mainRef = useRef(null);
+  const mainRef    = useRef(null);
+  const contentRef = useRef(null);
+
+  const scrollToTop = useLerpScroll(mainRef, contentRef);
 
   const handleAnalyse = async (payload) => {
     setLoading(true); setError(null); setData(null);
@@ -680,7 +923,7 @@ export default function App() {
       setData(result);
       setGenTime(((Date.now() - t0) / 1000).toFixed(1));
       setActiveTab('episodes');
-      setTimeout(() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+      setTimeout(() => scrollToTop(), 100);
     } catch (err) {
       setError(err.message || 'Failed to connect. Is the backend running?');
     } finally { setLoading(false); }
@@ -690,26 +933,30 @@ export default function App() {
 
   return (
     <div className="arc-shell">
+      {/* Background */}
+      <div className="arc-bg">
+        <div className="arc-bg-grid" />
+        <div className="arc-bg-orb arc-bg-orb-1" />
+        <div className="arc-bg-orb arc-bg-orb-2" />
+        <div className="arc-bg-orb arc-bg-orb-3" />
+        <div className="arc-bg-beam" />
+        <div className="arc-bg-vignette" />
+      </div>
       <div className="scan-line" />
 
       {/* ── TOPBAR ── */}
       <header className="arc-topbar">
         <a href="#" className="arc-logo">
           <div className="arc-logo-mark">A</div>
-          <span className="arc-logo-text">
-            Arclight<span className="arc-logo-ver"> v2</span>
-          </span>
+          <span className="arc-logo-text">Arclytic</span>
         </a>
 
         <div className="topbar-center">
           <div className="topbar-dot" />
-          AI Episodic Intelligence Engine
+          AI Episodic Intelligence Engine · Arclytic
         </div>
 
         <div className="topbar-right">
-          <button className="topbar-btn">Docs</button>
-          <button className="topbar-btn">API</button>
-          <button className="topbar-btn topbar-btn-primary">Upgrade</button>
         </div>
       </header>
 
@@ -760,7 +1007,7 @@ export default function App() {
 
       {/* ── MAIN ── */}
       <main className="arc-main" ref={mainRef}>
-        <div className="arc-content">
+        <div className="arc-content" ref={contentRef}>
 
           {/* Hero */}
           <div className="arc-hero anim-fade">
@@ -773,7 +1020,7 @@ export default function App() {
               Transform stories into<br /><em>structured episode arcs.</em>
             </h1>
             <p className="arc-hero-sub">
-              Paste your story premise below. Arclight will analyse narrative structure, map emotional beats, score cliffhangers, and predict viewer retention — all in one run.
+              Paste your story premise below. Arclytic will analyse narrative structure, map emotional beats, score cliffhangers, and predict viewer retention — all in one run.
             </p>
           </div>
 

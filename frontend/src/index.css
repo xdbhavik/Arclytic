@@ -63,6 +63,16 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Global momentum scrolling for all scrollable elements */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Smooth scroll for overflow containers */
+[style*="overflow"], .arc-main, .arc-sidebar, .panel-tabs {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--bg-primary);
@@ -560,6 +570,9 @@ h3 { font-size: 1.125rem; }
   border-radius: var(--radius-md);
   padding: 0.35rem;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
 }
 
 .panel-tab {
